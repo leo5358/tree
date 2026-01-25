@@ -32,13 +32,14 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
         let name = entry.file_name().to_string_lossy().into_owned();
         let path = entry.path();
 
-        // 處理大小顯示邏輯
+        let icon = get_icon(&path);
+
         let size_str = if args.size {
             if let Some(meta) = metadata {
                 if meta.is_file() {
                     format!(" [{}]", format_size(meta.len()))
                 } else {
-                    "".to_string() // 目錄通常不直接顯示大小，或顯示為空
+                    "".to_string()
                 }
             } else {
                 "".to_string()
@@ -48,12 +49,33 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
         };
 
         let char_prefix = if is_last { "└── " } else { "├── " };
-        println!("{}{}{}{}", prefix, char_prefix, name, size_str);
+        println!("{}{}{} {}{}", prefix, char_prefix, icon, name, size_str);
 
         if path.is_dir() {
             let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
             print_tree(&path, &new_prefix, args, exclude_set, current_depth + 1);
         }
+    }
+}
+
+fn get_icon(path: &Path) -> &'static str {
+    if path.is_dir() {
+        return "\u{f07b}"; 
+    }
+
+    let extension = path.extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+
+    match extension {
+        "rs" => "\u{e7a8}",    //  (Rust)
+        "md" => "\u{f48a}",    //  (Markdown)
+        "toml" => "\u{e60b}",  //  (Configuration/TOML)
+        "lock" => "\u{f023}",  //  (Lock file)
+        "gitignore" => "\u{f1d3}", //  (Git)
+        "py" => "\u{e606}",    //  (Python)
+        "js" | "ts" => "\u{e781}", //  (JS/TS)
+        _ => "\u{f15b}",       //  (Default File)
     }
 }
 
