@@ -5,27 +5,34 @@ A simple command-line utility written in Rust to visualize directory structures.
 ## Features
 
 * **Recursive Visualization**: Displays a hierarchical tree of files and directories.
+* **Nerd Fonts Support**: Displays icons based on file types and extensions (e.g., Rust, Python, Markdown) for a more intuitive and aesthetic output.
 * **Clean Output**: Uses standard tree characters (`├──`, `└──`, `│`) for clear formatting.
-* **File Size Display**: Supports the `-s` flag to show formatted file sizes alongside names.
-* **Depth Control**: Supports the `-d` flag to limit the depth of the directory traversal.
-* **Custom Path**: Supports the `-p` flag to specify a target directory instead of just the current one.
+* **File Size Display**: Supports the `-s` or `--size` flag to show formatted file sizes alongside names.
+* **Depth Control**: Supports the `-d` or `--depth` flag to limit the depth of the directory traversal.
+* **Filtering**: Supports the `-e` or `--exclude` flag to ignore specific files or directories. By default, hidden files (starting with `.`) are ignored unless the `-a` flag is used.
+
+## Requirements
+
+* **Nerd Fonts**: To display file icons correctly, ensure your terminal is configured to use a [Nerd Font](https://www.nerdfonts.com/) (e.g., *FiraCode Nerd Font* or *JetBrainsMono Nerd Font*).
 
 ## Usage
 
-You can run the utility using `cargo run --` followed by the desired options:
+You can run the utility using `cargo run --` followed by the path and desired options:
 
 ```bash
-cargo run -- [OPTIONS]
+cargo run -- [PATH] [OPTIONS]
 
 ```
 
-### Arguments
+### Arguments & Options
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `-p, --path <PATH>` | Specifies the target path (defaults to `.`) | `cargo run -- -p ./src` |
-| `-s, --size` | Displays the size of files and directories | `cargo run -- -s` |
-| `-d, --depth <NUMBER>` | Limits the depth of the tree traversal | `cargo run -- -d 2` |
+| `PATH` | Specifies the target path (defaults to `.`) | `cargo run -- ./src` |
+| `-a, --all` | Displays hidden files and directories | `cargo run -- -a` |
+| `-s, --size` | Displays formatted file sizes | `cargo run -- -s` |
+| `-d, --depth <NUM>` | Limits the depth of the tree traversal | `cargo run -- -d 2` |
+| `-e, --exclude <NAME>` | Excludes specific directory or file names | `cargo run -- -e target .git` |
 
 ## Implementation Details
 
@@ -35,6 +42,6 @@ cargo run -- [OPTIONS]
 
 ## Future Improvements
 
-* Add support for excluding specific files or directories (e.g., `.git` or `target`).
 * Support saving the output directly to a text file.
-* Implement color coding to distinguish between files and directories.
+* Implement color coding to distinguish between different file types and permissions.
+* Expand the icon mapping for more specific file formats.
