@@ -24,6 +24,12 @@ cargo run -- [PATH] [OPTIONS]
 
 ```
 
+To use this tool globally, navigate to the project directory and run 
+
+```bash
+cargo install --path .
+```
+
 ### Arguments & Options
 
 | Option | Description | Example |
