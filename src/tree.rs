@@ -1,73 +1,92 @@
 use std::collections::HashSet;
-use std::fs;
-use std::io;
 use std::path::Path;
+use std::io;
+use ignore::{WalkBuilder, DirEntry};
 use crate::args::Args;
 
 pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>, current_depth: u32) {
+    // 1. 深度檢查
     if let Some(max_depth) = args.depth {
         if current_depth >= max_depth { return; }
     }
 
-    // 修改：針對 fs::read_dir 的結果進行模式匹配
-    let entries = match fs::read_dir(path) {
-        Ok(read_dir) => {
-            let mut list: Vec<_> = read_dir
-                .filter_map(|e| e.ok())
-                .filter(|entry| {
-                    let name = entry.file_name().to_string_lossy().into_owned();
-                    if !args.all && name.starts_with('.') { return false; }
-                    if exclude_set.contains(&name) { return false; }
-                    true
-                })
-                .collect();
-            list.sort_by_key(|e| e.file_name());
-            list
-        }
-        // 新增：當發生錯誤時，印出黃色的錯誤提示訊息而非靜默退出
-        Err(e) => {
-            let error_msg = match e.kind() {
-                io::ErrorKind::PermissionDenied => "Permission Denied",
-                io::ErrorKind::NotFound => "Not Found",
-                _ => "Access Error",
-            };
-            // \x1b[33m 為黃色，\x1b[0m 為重置顏色
-            println!("{}\x1b[33m└── [{}]\x1b[0m", prefix, error_msg);
-            return;
-        }
-    };
+    // 2. 收集並過濾該層級的檔案
+    let entries = collect_entries(path, prefix, args, exclude_set);
 
     let count = entries.len();
     for (i, entry) in entries.into_iter().enumerate() {
         let is_last = i == count - 1;
-        let metadata = entry.metadata().ok();
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let path = entry.path();
-
-        let icon = get_icon(&path);
-
-        let size_str = if args.size {
-            if let Some(meta) = metadata {
-                if meta.is_file() {
-                    format!(" [{}]", format_size(meta.len()))
-                } else {
-                    "".to_string()
-                }
-            } else {
-                "".to_string()
-            }
-        } else {
-            "".to_string()
-        };
-
+        let entry_path = entry.path();
+        
+        // 3. 格式化並印出當前行
+        let label = format_node_label(&entry, args);
         let char_prefix = if is_last { "└── " } else { "├── " };
-        println!("{}{}{} {}{}", prefix, char_prefix, icon, name, size_str);
+        println!("{}{}{}", prefix, char_prefix, label);
 
-        if path.is_dir() {
+        // 4. 遞迴處理子目錄
+        if entry_path.is_dir() {
             let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
-            print_tree(&path, &new_prefix, args, exclude_set, current_depth + 1);
+            print_tree(&entry_path, &new_prefix, args, exclude_set, current_depth + 1);
         }
     }
+}
+
+/// 負責處理檔案系統的走訪與錯誤回報
+fn collect_entries(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>) -> Vec<DirEntry> {
+    let mut entries = Vec::new();
+    let walker = WalkBuilder::new(path)
+        .max_depth(Some(1))
+        .hidden(!args.all)
+        .git_ignore(true)
+        .build();
+
+    for result in walker {
+        match result {
+            Ok(entry) => {
+                if entry.path() == path { continue; }
+                let name = entry.file_name().to_string_lossy();
+                if exclude_set.contains(name.as_ref()) { continue; }
+                entries.push(entry);
+            }
+            Err(e) => {
+                print_error_message(prefix, e);
+            }
+        }
+    }
+    // 依名稱排序
+    entries.sort_by_key(|e| e.file_name().to_os_string());
+    entries
+}
+
+/// 負責處理單一檔案或目錄的文字與圖示格式化
+fn format_node_label(entry: &DirEntry, args: &Args) -> String {
+    let path = entry.path();
+    let name = entry.file_name().to_string_lossy();
+    let icon = get_icon(path);
+    
+    let size_str = if args.size {
+        entry.metadata().ok()
+            .filter(|m| m.is_file())
+            .map(|m| format!(" [{}]", format_size(m.len())))
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    format!("{} {}{}", icon, name, size_str)
+}
+
+/// 專門處理錯誤訊息的顯示
+fn print_error_message(prefix: &str, e: ignore::Error) {
+    let msg = e.io_error()
+        .map(|io_err| match io_err.kind() {
+            io::ErrorKind::PermissionDenied => "Permission Denied",
+            io::ErrorKind::NotFound => "Not Found",
+            _ => "Access Error",
+        })
+        .unwrap_or("Unknown Error");
+    
+    println!("{}\x1b[33m└── [{}]\x1b[0m", prefix, msg);
 }
 
 fn get_icon(path: &Path) -> &'static str {
