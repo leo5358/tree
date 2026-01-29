@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::path::Path;
 use crate::args::Args;
 
@@ -8,6 +9,7 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
         if current_depth >= max_depth { return; }
     }
 
+    // 修改：針對 fs::read_dir 的結果進行模式匹配
     let entries = match fs::read_dir(path) {
         Ok(read_dir) => {
             let mut list: Vec<_> = read_dir
@@ -22,7 +24,17 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
             list.sort_by_key(|e| e.file_name());
             list
         }
-        Err(_) => return,
+        // 新增：當發生錯誤時，印出黃色的錯誤提示訊息而非靜默退出
+        Err(e) => {
+            let error_msg = match e.kind() {
+                io::ErrorKind::PermissionDenied => "Permission Denied",
+                io::ErrorKind::NotFound => "Not Found",
+                _ => "Access Error",
+            };
+            // \x1b[33m 為黃色，\x1b[0m 為重置顏色
+            println!("{}\x1b[33m└── [{}]\x1b[0m", prefix, error_msg);
+            return;
+        }
     };
 
     let count = entries.len();
