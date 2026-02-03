@@ -63,6 +63,7 @@ cargo run -- [PATH] [OPTIONS]
 * **Language**: Rust (2024 edition).
 * **Argument Parsing**: Uses the `clap` crate (v4.5) for robust command-line flag and argument handling.
 * **File Traversal**: Utilizes the `ignore` crate for efficient filesystem walking with `.gitignore` support.
+* **Summary Statistics**: Automatically displays a summary of the total number of directories and files processed at the end of the execution.
 
 ## Future Improvements
 
