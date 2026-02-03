@@ -4,31 +4,57 @@ use std::io;
 use ignore::{WalkBuilder, DirEntry};
 use crate::args::Args;
 
-pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>, current_depth: u32) {
-    // 1. 深度檢查
-    if let Some(max_depth) = args.depth {
-        if current_depth >= max_depth { return; }
+pub struct TreeStats {
+    pub directories: u32,
+    pub files: u32,
+}
+
+impl TreeStats {
+    pub fn new() -> Self {
+        TreeStats { directories: 0, files: 0 }
     }
 
-    // 2. 收集並過濾該層級的檔案
-    let entries = collect_entries(path, prefix, args, exclude_set);
+    // 方便累加其他統計結果
+    pub fn add(&mut self, other: TreeStats) {
+        self.directories += other.directories;
+        self.files += other.files;
+    }
+}
 
+pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>, current_depth: u32) -> TreeStats {
+    let mut stats = TreeStats::new();
+
+    if let Some(max_depth) = args.depth {
+        if current_depth >= max_depth {
+            return stats;
+        }
+    }
+
+    let entries = collect_entries(path, prefix, args, exclude_set);
     let count = entries.len();
+    
+    let gray = "\x1b[90m";
+    let reset = "\x1b[0m";
+
     for (i, entry) in entries.into_iter().enumerate() {
         let is_last = i == count - 1;
         let entry_path = entry.path();
         
-        // 3. 格式化並印出當前行
         let label = format_node_label(&entry, args);
         let char_prefix = if is_last { "└── " } else { "├── " };
-        println!("{}{}{}", prefix, char_prefix, label);
+        println!("{}{}{}{}", gray, prefix, char_prefix, label);
 
-        // 4. 遞迴處理子目錄
         if entry_path.is_dir() {
+            stats.directories += 1;
             let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
-            print_tree(&entry_path, &new_prefix, args, exclude_set, current_depth + 1);
+            // 遞迴並累加結果
+            stats.add(print_tree(&entry_path, &new_prefix, args, exclude_set, current_depth + 1));
+        } else {
+            stats.files += 1;
         }
     }
+    
+    stats
 }
 
 /// 負責處理檔案系統的走訪與錯誤回報

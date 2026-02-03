@@ -17,5 +17,11 @@ fn main() {
     }
 
     println!("{}", args.path);
-    tree::print_tree(root_path, "", &args, &exclude_set, 0);
+    
+    let stats = tree::print_tree(root_path, "", &args, &exclude_set, 0);
+    print_summary(stats);
+}
+
+fn print_summary(stats: tree::TreeStats) {
+    println!("\n{} directories, {} files", stats.directories, stats.files);
 }
