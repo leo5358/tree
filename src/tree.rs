@@ -64,16 +64,26 @@ fn format_node_label(entry: &DirEntry, args: &Args) -> String {
     let name = entry.file_name().to_string_lossy();
     let icon = get_icon(path);
     
+    // 定義顏色序列
+    let blue = "\x1b[34;1m"; // 粗體藍色
+    let reset = "\x1b[0m";   // 重設顏色
+
+    let display_name = if path.is_dir() {
+        format!("{}{}{}", blue, name, reset)
+    } else {
+        name.to_string()
+    };
+
     let size_str = if args.size {
         entry.metadata().ok()
             .filter(|m| m.is_file())
-            .map(|m| format!(" [{}]", format_size(m.len())))
+            .map(|m| format!(" \x1b[90m[{}]\x1b[0m", format_size(m.len()))) // 灰色顯示大小
             .unwrap_or_default()
     } else {
         String::new()
     };
 
-    format!("{} {}{}", icon, name, size_str)
+    format!("{} {}{}", icon, display_name, size_str)
 }
 
 /// 專門處理錯誤訊息的顯示
@@ -86,7 +96,7 @@ fn print_error_message(prefix: &str, e: ignore::Error) {
         })
         .unwrap_or("Unknown Error");
     
-    println!("{}\x1b[33m└── [{}]\x1b[0m", prefix, msg);
+    println!("\x1b[90m{}\x1b[33m└── [{}]\x1b[0m", prefix, msg);
 }
 
 fn get_icon(path: &Path) -> &'static str {
