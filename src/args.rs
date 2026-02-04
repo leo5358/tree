@@ -21,4 +21,8 @@ pub struct Args {
     /// 排除指定的目錄或檔案名稱
     #[arg(short = 'e', long = "exclude", num_args = 1..)]
     pub exclude: Vec<String>,
+
+    /// 不顯示圖示 (適用於無 Nerd Fonts 環境)
+    #[arg(short = 'n', long = "no-icon", default_value_t = false)]
+    pub no_icon: bool,
 }

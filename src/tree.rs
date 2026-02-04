@@ -88,7 +88,13 @@ fn collect_entries(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet
 fn format_node_label(entry: &DirEntry, args: &Args) -> String {
     let path = entry.path();
     let name = entry.file_name().to_string_lossy();
-    let icon = get_icon(path);
+    
+    // 邏輯修改：根據參數決定圖示字串
+    let icon_prefix = if args.no_icon {
+        String::new()
+    } else {
+        format!("{} ", get_icon(path))
+    };
     
     // 定義顏色序列
     let blue = "\x1b[34;1m"; // 粗體藍色
@@ -109,7 +115,8 @@ fn format_node_label(entry: &DirEntry, args: &Args) -> String {
         String::new()
     };
 
-    format!("{} {}{}", icon, display_name, size_str)
+    // 組合字串
+    format!("{}{}{}", icon_prefix, display_name, size_str)
 }
 
 /// 專門處理錯誤訊息的顯示
