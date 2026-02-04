@@ -7,12 +7,11 @@ A simple command-line utility written in Rust to visualize directory structures.
 * **Recursive Visualization**: Displays a hierarchical tree of files and directories.
 * **Summary Statistics**: Automatically displays a summary of the total number of directories and files processed at the end of the execution.
 * **Nerd Fonts Support**: Displays icons based on file types and extensions (e.g., Rust, Python, Markdown) for a more intuitive and aesthetic output.
+* **No Icon Mode**: Supports the `-n` or `--no-icon` flag to hide icons, ensuring compatibility with environments that do not support Nerd Fonts.
 * **Colorized Output**: Highlighting to distinguish between different types of content:
-* **Bold Blue**: Directories for better structural recognition.
-* **Yellow**: Error messages and permission warnings.
-* **Gray**: Tree connectors (`├──`) and metadata to keep the focus on filenames.
-
-
+    * **Bold Blue**: Directories for better structural recognition.
+    * **Yellow**: Error messages and permission warnings.
+    * **Gray**: Tree connectors (`├──`) and metadata to keep the focus on filenames.
 * **Clean Output**: Uses standard tree characters (`├──`, `└──`, `│`) for clear formatting.
 * **File Size Display**: Supports the `-s` or `--size` flag to show formatted file sizes alongside names.
 * **Depth Control**: Supports the `-d` or `--depth` flag to limit the depth of the directory traversal.
@@ -30,7 +29,7 @@ A simple command-line utility written in Rust to visualize directory structures.
 You can install the binary directly from the source code using `cargo`:
 
 ```bash
-git clone https://github.com/leo5358/tree.git
+git clone [https://github.com/leo5358/tree.git](https://github.com/leo5358/tree.git)
 cd tree
 cargo install --path .
 
@@ -58,6 +57,8 @@ cargo run -- [PATH] [OPTIONS]
 | `-s, --size` | Displays formatted file sizes | `tree -s` |
 | `-d, --depth <NUM>` | Limits the depth of the tree traversal | `tree -d 2` |
 | `-e, --exclude <NAME>` | Excludes specific directory or file names | `tree -e target .git` |
+| `-n, --no-icon` | Disables file icons (useful for terminals without Nerd Fonts) | `tree -n` |
+| `-h, --help` | Displays help information | `tree -h` |
 
 ## Implementation Details
 
