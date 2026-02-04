@@ -163,3 +163,49 @@ fn format_size(size: u64) -> String {
         format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_tree_stats_new_and_add() {
+        let mut stats1 = TreeStats::new();
+        stats1.files = 5;
+        stats1.directories = 2;
+
+        let stats2 = TreeStats { files: 3, directories: 1 };
+        
+        stats1.add(stats2);
+
+        assert_eq!(stats1.files, 8);
+        assert_eq!(stats1.directories, 3);
+    }
+
+    #[test]
+    fn test_format_size() {
+        // 測試 Byte
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(500), "500 B");
+        assert_eq!(format_size(1023), "1023 B");
+
+        // 測試 KB (1024 B = 1.0 KB)
+        assert_eq!(format_size(1024), "1.0 KB");
+        assert_eq!(format_size(1536), "1.5 KB"); // 1.5 * 1024
+
+        // 測試 MB
+        assert_eq!(format_size(1024 * 1024), "1.0 MB");
+    }
+
+    #[test]
+    fn test_get_icon_extension() {
+        // 測試副檔名對應
+        // 注意：因為路徑不存在，is_dir() 會回傳 false，所以會進入副檔名判斷邏輯
+        assert_eq!(get_icon(Path::new("main.rs")), "\u{e7a8}"); // Rust
+        assert_eq!(get_icon(Path::new("script.py")), "\u{e606}"); // Python
+        assert_eq!(get_icon(Path::new("README.md")), "\u{f48a}"); // Markdown
+        assert_eq!(get_icon(Path::new("unknown.xyz")), "\u{f15b}"); // Default
+        assert_eq!(get_icon(Path::new("Dockerfile")), "\u{f15b}"); // No extension
+    }
+}
