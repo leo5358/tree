@@ -25,11 +25,10 @@ impl TreeStats {
 pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>, current_depth: u32) -> TreeStats {
     let mut stats = TreeStats::new();
 
-    if let Some(max_depth) = args.depth {
-        if current_depth >= max_depth {
+    if let Some(max_depth) = args.depth
+        && current_depth >= max_depth {
             return stats;
         }
-    }
 
     let entries = collect_entries(path, prefix, args, exclude_set);
     let count = entries.len();
@@ -108,11 +107,10 @@ fn format_node_label(entry: &DirEntry, args: &Args) -> String {
     };
 
     // 3. 符號連結目標 (Link -> Target)
-    if is_symlink {
-        if let Ok(target) = fs::read_link(path) {
+    if is_symlink
+        && let Ok(target) = fs::read_link(path) {
             display_name = format!("{} -> {}", display_name, target.to_string_lossy().truecolor(150, 150, 150));
         }
-    }
 
     // 4. 檔案大小
     let size_str = if args.size && !is_dir {
