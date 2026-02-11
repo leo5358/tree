@@ -5,6 +5,7 @@ use args::Args;
 use clap::Parser;
 use std::collections::HashSet;
 use std::path::Path;
+use colored::*;
 
 fn main() {
     let args = Args::parse();
@@ -23,5 +24,8 @@ fn main() {
 }
 
 fn print_summary(stats: tree::TreeStats) {
-    println!("\n{} directories, {} files", stats.directories, stats.files);
+    println!("\n{} directories, {} files", 
+        stats.directories.to_string().blue().bold(), 
+        stats.files.to_string().green().bold()
+    );
 }

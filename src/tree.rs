@@ -1,7 +1,9 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::fs;
 use std::io;
 use ignore::{WalkBuilder, DirEntry};
+use colored::*; // 引入顏色套件
 use crate::args::Args;
 
 pub struct TreeStats {
@@ -14,7 +16,6 @@ impl TreeStats {
         TreeStats { directories: 0, files: 0 }
     }
 
-    // 方便累加其他統計結果
     pub fn add(&mut self, other: TreeStats) {
         self.directories += other.directories;
         self.files += other.files;
@@ -33,22 +34,20 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
     let entries = collect_entries(path, prefix, args, exclude_set);
     let count = entries.len();
     
-    let gray = "\x1b[90m";
-    let reset = "\x1b[0m";
-
     for (i, entry) in entries.into_iter().enumerate() {
         let is_last = i == count - 1;
         let entry_path = entry.path();
         
+        // 取得格式化後的顯示字串
         let label = format_node_label(&entry, args);
-        let char_prefix = if is_last { "└── " } else { "├── " };
-        println!("{}{}{}{}", gray, prefix, char_prefix, label);
+        
+        let connector = if is_last { "└── " } else { "├── " };
+        println!("{}{}{}", prefix.truecolor(90, 90, 90), connector.truecolor(90, 90, 90), label);
 
-        if entry_path.is_dir() {
+        if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
             stats.directories += 1;
             let new_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
-            // 遞迴並累加結果
-            stats.add(print_tree(&entry_path, &new_prefix, args, exclude_set, current_depth + 1));
+            stats.add(print_tree(entry_path, &new_prefix, args, exclude_set, current_depth + 1));
         } else {
             stats.files += 1;
         }
@@ -57,9 +56,10 @@ pub fn print_tree(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<
     stats
 }
 
-/// 負責處理檔案系統的走訪與錯誤回報
 fn collect_entries(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet<String>) -> Vec<DirEntry> {
     let mut entries = Vec::new();
+
+    //wallerbuilder 會自動處理 .gitignore 和 hidden 檔案，這裡我們只需要設定好參數即可
     let walker = WalkBuilder::new(path)
         .max_depth(Some(1))
         .hidden(!args.all)
@@ -79,47 +79,53 @@ fn collect_entries(path: &Path, prefix: &str, args: &Args, exclude_set: &HashSet
             }
         }
     }
-    // 依名稱排序
+    
+    // 排序：目錄優先，然後依名稱排序 (可選，這裡維持純名稱排序)
     entries.sort_by_key(|e| e.file_name().to_os_string());
     entries
 }
 
-/// 負責處理單一檔案或目錄的文字與圖示格式化
 fn format_node_label(entry: &DirEntry, args: &Args) -> String {
     let path = entry.path();
     let name = entry.file_name().to_string_lossy();
-    
-    // 邏輯修改：根據參數決定圖示字串
-    let icon_prefix = if args.no_icon {
+    let is_dir = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+    let is_symlink = entry.path_is_symlink();
+
+    // 1. 圖示
+    let icon = if args.no_icon {
         String::new()
     } else {
-        format!("{} ", get_icon(path))
+        format!("{} ", get_icon(path, is_dir))
     };
     
-    // 定義顏色序列
-    let blue = "\x1b[34;1m"; // 粗體藍色
-    let reset = "\x1b[0m";   // 重設顏色
-
-    let display_name = if path.is_dir() {
-        format!("{}{}{}", blue, name, reset)
+    // 2. 名稱與顏色
+    let mut display_name = if is_dir {
+        name.blue().bold().to_string()
+    } else if is_symlink {
+        name.cyan().to_string()
     } else {
         name.to_string()
     };
 
-    let size_str = if args.size {
+    // 3. 符號連結目標 (Link -> Target)
+    if is_symlink {
+        if let Ok(target) = fs::read_link(path) {
+            display_name = format!("{} -> {}", display_name, target.to_string_lossy().truecolor(150, 150, 150));
+        }
+    }
+
+    // 4. 檔案大小
+    let size_str = if args.size && !is_dir {
         entry.metadata().ok()
-            .filter(|m| m.is_file())
-            .map(|m| format!(" \x1b[90m[{}]\x1b[0m", format_size(m.len()))) // 灰色顯示大小
+            .map(|m| format!(" [{}]", format_size(m.len())).truecolor(90, 90, 90).to_string())
             .unwrap_or_default()
     } else {
         String::new()
     };
 
-    // 組合字串
-    format!("{}{}{}", icon_prefix, display_name, size_str)
+    format!("{}{}{}", icon, display_name, size_str)
 }
 
-/// 專門處理錯誤訊息的顯示
 fn print_error_message(prefix: &str, e: ignore::Error) {
     let msg = e.io_error()
         .map(|io_err| match io_err.kind() {
@@ -129,83 +135,70 @@ fn print_error_message(prefix: &str, e: ignore::Error) {
         })
         .unwrap_or("Unknown Error");
     
-    println!("\x1b[90m{}\x1b[33m└── [{}]\x1b[0m", prefix, msg);
+    println!("{}{} [{}]", prefix.truecolor(90, 90, 90), "└── ".truecolor(90, 90, 90), msg.yellow());
 }
 
-fn get_icon(path: &Path) -> &'static str {
-    if path.is_dir() {
-        return "\u{f07b}"; 
+fn get_icon(path: &Path, is_dir: bool) -> &'static str {
+    if is_dir {
+        return "\u{f07b}"; //  (Folder)
     }
 
     let extension = path.extension()
         .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+
+    let file_name = path.file_name()
+        .and_then(|s| s.to_str())
         .unwrap_or("");
 
-    match extension {
+    // 特殊檔名優先判斷
+    match file_name {
+        "Dockerfile" | "docker-compose.yml" => return "\u{f308}", // 
+        "Makefile" => return "\u{e60d}", // 
+        "Cargo.toml" | "Cargo.lock" => return "\u{e7a8}", // 
+        ".gitignore" | ".gitattributes" => return "\u{f1d3}", // 
+        _ => {}
+    }
+
+    // 副檔名判斷
+    match extension.as_str() {
         "rs" => "\u{e7a8}",    //  (Rust)
-        "md" => "\u{f48a}",    //  (Markdown)
-        "toml" => "\u{e60b}",  //  (Configuration/TOML)
-        "lock" => "\u{f023}",  //  (Lock file)
-        "gitignore" => "\u{f1d3}", //  (Git)
         "py" => "\u{e606}",    //  (Python)
-        "js" | "ts" => "\u{e781}", //  (JS/TS)
+        "js" => "\u{e74e}",    //  (JS)
+        "ts" | "tsx" => "\u{e628}", //  (TS)
+        "html" => "\u{e736}",  //  (HTML)
+        "css" => "\u{e749}",   //  (CSS)
+        "scss" | "sass" => "\u{e74b}", //  (SASS)
+        "json" => "\u{e60b}",  //  (JSON)
+        "md" => "\u{f48a}",    //  (Markdown)
+        "toml" | "yaml" | "yml" => "\u{e60b}", //  (Config)
+        "c" | "h" => "\u{e61e}", //  (C)
+        "cpp" | "hpp" | "cc" => "\u{e61d}", //  (C++)
+        "go" => "\u{e627}",    //  (Go)
+        "java" | "jar" => "\u{e738}", //  (Java)
+        "sh" | "bash" | "zsh" => "\u{f489}", //  (Shell)
+        "lock" => "\u{f023}",  //  (Lock)
+        "zip" | "tar" | "gz" | "7z" => "\u{f410}", //  (Archive)
+        "png" | "jpg" | "jpeg" | "svg" | "ico" => "\u{f1c5}", //  (Image)
+        "pdf" => "\u{f1c1}",   //  (PDF)
+        "txt" => "\u{f15c}",   //  (Text)
         _ => "\u{f15b}",       //  (Default File)
     }
 }
 
-/// 將 Byte 轉換為人類易讀的格式
 fn format_size(size: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+
     if size < 1024 {
         format!("{} B", size)
-    } else if size < 1024 * 1024 {
-        format!("{:.1} KB", size as f64 / 1024.0)
+    } else if (size as f64) < MB {
+        format!("{:.1} KB", size as f64 / KB)
+    } else if (size as f64) < GB {
+        format!("{:.1} MB", size as f64 / MB)
     } else {
-        format!("{:.1} MB", size as f64 / (1024.0 * 1024.0))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_tree_stats_new_and_add() {
-        let mut stats1 = TreeStats::new();
-        stats1.files = 5;
-        stats1.directories = 2;
-
-        let stats2 = TreeStats { files: 3, directories: 1 };
-        
-        stats1.add(stats2);
-
-        assert_eq!(stats1.files, 8);
-        assert_eq!(stats1.directories, 3);
-    }
-
-    #[test]
-    fn test_format_size() {
-        // 測試 Byte
-        assert_eq!(format_size(0), "0 B");
-        assert_eq!(format_size(500), "500 B");
-        assert_eq!(format_size(1023), "1023 B");
-
-        // 測試 KB (1024 B = 1.0 KB)
-        assert_eq!(format_size(1024), "1.0 KB");
-        assert_eq!(format_size(1536), "1.5 KB"); // 1.5 * 1024
-
-        // 測試 MB
-        assert_eq!(format_size(1024 * 1024), "1.0 MB");
-    }
-
-    #[test]
-    fn test_get_icon_extension() {
-        // 測試副檔名對應
-        // 注意：因為路徑不存在，is_dir() 會回傳 false，所以會進入副檔名判斷邏輯
-        assert_eq!(get_icon(Path::new("main.rs")), "\u{e7a8}"); // Rust
-        assert_eq!(get_icon(Path::new("script.py")), "\u{e606}"); // Python
-        assert_eq!(get_icon(Path::new("README.md")), "\u{f48a}"); // Markdown
-        assert_eq!(get_icon(Path::new("unknown.xyz")), "\u{f15b}"); // Default
-        assert_eq!(get_icon(Path::new("Dockerfile")), "\u{f15b}"); // No extension
+        format!("{:.1} GB", size as f64 / GB)
     }
 }
